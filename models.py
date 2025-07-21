@@ -33,8 +33,18 @@ class Destination:
         self.lon = dest_data['lon']
 
     @classmethod
-    def save_destination(cls, dest_data):
+    def save_destination_with_zip(cls, dest_data):
         query = "INSERT INTO Destinations (zip, name, lat, lon) VALUES (%(zip)s, %(name)s, %(lat)s, %(lon)s);"
+        return connectToMySQL(cls.db).query_db(query, dest_data)
+
+    @classmethod
+    def save_destination_without_zip(cls, dest_data):
+        query = "INSERT INTO Destinations (name, lat, lon) VALUES (%(name)s, %(lat)s, %(lon)s);"
+        return connectToMySQL(cls.db).query_db(query, dest_data)
+    
+    @classmethod
+    def get_destination_by_id(cls, dest_data):
+        query = "SELECT * FROM Destinations WHERE id = %(id)s;"
         return connectToMySQL(cls.db).query_db(query, dest_data)
     
     @classmethod
@@ -61,10 +71,10 @@ class Search:
 
     @classmethod
     def get_user_saved_searches(cls, data):
-        query = "SELECT zip, name, lat, lon FROM Destinations JOIN Searches ON destination_id = Destinations.id WHERE user_id = %(user_id)s;"
+        query = "SELECT zip, name, lat, lon, id FROM Destinations JOIN Searches ON destination_id = Destinations.id WHERE user_id = %(user_id)s;"
         return connectToMySQL(cls.db).query_db(query, data)
 
     @classmethod
     def delete_search(cls, search_data):
-        query = "DELETE FROM Searches WHERE id = %(id)s;"
+        query = "DELETE FROM Searches WHERE user_id = %(user_id)s AND destination_id = %(destination_id)s;"
         return connectToMySQL(cls.db).query_db(query, search_data)
