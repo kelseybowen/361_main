@@ -41,7 +41,7 @@ def display_title(page_title_string=""):
 
 # WELCOME SCREEN
 def welcome_user():
-    app_description = """\nEnter a valid US zip code to see the city name and weather forecast. \nSearch as a guest or create a profile to save destinations. \n\nCreating a profile takes less than 30 seconds and allows you \nto save destinations for your future travels.
+    app_description = """\nSearch a destination by zip code or city name \nand get the latitude and longitude. \n\nSearch as a guest or create a profile to save destinations. \n\nCreating a profile takes less than 30 seconds and allows you \nto save destinations for your future travels.
     """
     welcome_menu = """------ Menu ------  \n[R] Register (New User) \n[L] Login (Existing User) \n[G] Guest User \n[Q] Quit\n------------------"""
     display_title(app_description)
@@ -106,11 +106,10 @@ def create_profile():
         else:
             print("This will be the name of your profile.")
             confirm = input("\nIs this correct? y/n: ")
-            print("\n")
             if confirm.lower() == 'y':
                 user_data = {'name': new_user}
                 User.create_user(user_data)
-                user_dashboard(new_user)
+                user_dashboard(new_user, new_profile=True)
             elif confirm.lower() == 'n':
                 create_profile()
             else:
@@ -123,7 +122,7 @@ def create_profile():
         new_user()
 
 # USER DASHBOARD
-def user_dashboard(user):
+def user_dashboard(user, new_profile=False):
     if user == "Guest":
         dash_title = "\nWelcome, Guest!\n"
         menu = """------ Menu ------  \n[S] Destination Search \n[M] Main Menu\n------------------"""
@@ -131,6 +130,8 @@ def user_dashboard(user):
         dash_title = f"""{user}'s Dashboard\n"""
         menu = """------ Menu ------  \n[S] Destination Search \n[V] View Saved Destinations \n[M] Main Menu\n------------------"""
     display_title(dash_title)
+    if new_profile:
+        print(f"Profile successfully created for {user}\n")
     print(f"{menu}\n")
     choice = input("""Make a selection: """)
     if choice.lower() == "s":
@@ -155,9 +156,11 @@ def destination_search(user, first_run=True):
         dest_info = get_destination_name_from_zip(zip)
         print("""Search Results:\n""")
         print(f"You searched for: {zip}\n")
-        print(dest_info[1])
+        for key, value in dest_info[1].items():
+            print(f"{key.title()}: {value}")
+        # print(dest_info[1])
         if dest_info[0]: # valid search
-            user_choice_save = input("Save this search? y/n: ")
+            user_choice_save = input("\nSave this search? y/n: ")
             if user_choice_save.lower() == 'y':
                 save_search_to_db(dest_info[1], user)
             else:
@@ -174,6 +177,7 @@ def destination_search(user, first_run=True):
         print("""Search Results:\n""")
         if dest_info: # valid search
             print(f"You searched for: {city, state}\n")
+            display_details(dest_info[1])
             user_choice_save = input("Save this search? y/n: ")
             if user_choice_save.lower() == 'y':
                 dest_data = {'name': dest_info[1]['name'], 'lat': dest_info[1]['lat'], 'lon': dest_info[1]['lon']}
@@ -198,7 +202,6 @@ def get_destination_name_from_zip(zip):
 
 def get_destination_from_city_name(city, state):
     req = requests.get(f'http://api.openweathermap.org/geo/1.0/direct?q={city},{state},US&limit=1&appid={OW_API_KEY}')
-    print(req.json())
     if req.status_code != 200:
         return (False, "Invalid location name. Please enter a valid US city and state.")
     else:
@@ -278,9 +281,9 @@ def view_saved_destinations(user):
             if search_to_view.isdigit():
                 saved_search_details = Destination.get_destination_by_id({'id': int(search_to_view)})
                 print(saved_search_details)
-                display_details(saved_search_details[0], user)
-                nav_away_from_details = input("Enter 'V' to return to your Saved Destinations, or any other key to Quit: ")
-                if nav_away_from_details.lower() == 'v':
+                display_details(saved_search_details[0])
+                nav_away_from_details = input("Enter 'S' to return to your Saved Destinations, or any other key to Quit: ")
+                if nav_away_from_details.lower() == 's':
                     view_saved_destinations(user)
                 else:
                     print("Goodbye\n")
@@ -312,9 +315,12 @@ def view_saved_destinations(user):
             print("Invalid entry. Please try again.")
             view_saved_destinations(user)
 
-def display_details(destination, user):
+def display_details(destination):
     display_title("Search Details\n")
-    print(f"Details for {destination['name']}: \nZip code: {destination['zip']} \nLatitude: {destination['lat']} \nLongitude: {destination['lon']}\n\n")
+    if 'zip' in destination:
+        print(f"Details for {destination['name']}: \nZip code: {destination['zip']} \nLatitude: {destination['lat']} \nLongitude: {destination['lon']}\n\n")
+    else:
+        print(f"Details for {destination['name']}: \nLatitude: {destination['lat']} \nLongitude: {destination['lon']}\n\n")
 
 if __name__ == "__main__":
     welcome_user()
