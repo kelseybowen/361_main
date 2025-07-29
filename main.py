@@ -7,7 +7,7 @@ import os
 import json
 import pymysql
 import time
-from models import User, Destination, Search
+from models import User, Destination, Search, Restaurants
 import requests
 from dotenv import load_dotenv
 import zmq
@@ -147,6 +147,18 @@ def user_dashboard(user, new_profile=False):
     else:
         user_dashboard(user)
 
+def display_search_results(user, destination):
+    print("""Search Results:\n""")
+    print(f"You searched for: {destination['zip']}\n")
+    for key, value in destination[1].items():
+        print(f"{key.title()}: {value}")
+    if destination[0]: # valid search
+        user_choice_save = input("\nSave this search? y/n: ")
+        if user_choice_save.lower() == 'y':
+            save_search_to_db(destination[1], user)
+    else:
+        destination_search(user)
+
 # DESTINATION SEARCH
 def destination_search(user, first_run=True):
     if first_run:
@@ -158,17 +170,8 @@ def destination_search(user, first_run=True):
         zip = input("Enter a valid US zip code to search: ")
         if len(zip) == 5 and zip.isnumeric():
             dest_info = get_destination_name_from_zip(zip)
-            print("""Search Results:\n""")
-            print(f"You searched for: {zip}\n")
-            for key, value in dest_info[1].items():
-                print(f"{key.title()}: {value}")
-            if dest_info[0]: # valid search
-                user_choice_save = input("\nSave this search? y/n: ")
-                if user_choice_save.lower() == 'y':
-                    save_search_to_db(dest_info[1], user)
-                else:
-                    destination_search(user)
-        else: # invalid search
+            display_search_results(user, dest_info)
+        else:
             print("Invalid entry. Please try again.")
             destination_search(user, first_run=False)
     
@@ -180,8 +183,7 @@ def destination_search(user, first_run=True):
         print("""Search Results:\n""")
         if dest_info: # valid search
             print(f"You searched for: {city, state}\n")
-            print(f"destination info ========= {dest_info}")
-            display_details(dest_info[1])
+            display_search_results(user, dest_info)
             user_choice_save = input("Save this search? y/n: ")
             if user_choice_save.lower() == 'y':
                 dest_data = {'name': dest_info[1]['name'], 'lat': dest_info[1]['lat'], 'lon': dest_info[1]['lon']}
@@ -250,17 +252,7 @@ def view_saved_destinations(user):
     
     # USER HAS NO SAVED SEARCHES
     if len(saved_searches) == 0:
-        print("No Saved Searches to display.\n")
-        menu = """\n------ Menu ------  \n[R] Return to Dashboard \n[Q] Quit\n------------------"""
-        print(f"{menu}\n")
-        selection = (input("Make a selection: "))
-        if selection.lower() == 'r':
-            user_dashboard(user)
-        elif selection.lower() == 'q':
-            pass
-        else:
-            print("Invalid selection. Please try again")
-            view_saved_destinations(user)
+        display_no_saved_searches(user)
             
     # USER HAS SAVED SEARCHES
     else:
@@ -269,7 +261,6 @@ def view_saved_destinations(user):
                 print(f"[{saved_searches[i]['id']}] {saved_searches[i]['name']}: {saved_searches[i]['zip']}")
             else:
                 print(f"[{saved_searches[i]['id']}] {saved_searches[i]['name']}")
-                
         menu = """\n------ Menu ------  \n[R] Return to Dashboard \n[V] View Details of a Saved Destination \n[D] Delete a Saved Destination \n[Q] Quit\n------------------"""
         print(f"\n{menu}\n")
         selection = (input("Make a selection: "))
@@ -283,21 +274,21 @@ def view_saved_destinations(user):
                 print(f"[{saved_searches[i]['id']}] {saved_searches[i]['name']}: {saved_searches[i]['zip']}")
             search_to_view = input("\nEnter the number of the Destination you would like to see details for: ")
             if search_to_view.isdigit():
-                saved_search_details = Destination.get_destination_by_id({'id': int(search_to_view)})
-                display_details(saved_search_details[0])
-                nav_away_from_details = input("Enter 'S' to return to your Saved Destinations, or any other key to Quit: ")
-                if nav_away_from_details.lower() == 's':
-                    view_saved_destinations(user)
-                else:
-                    print("Goodbye\n")
-                    pass
+                destination = Destination.get_destination_by_id({'id': int(search_to_view)})
+                display_single_destination_details(user, destination[0])
+                # nav_away_from_details = input("Enter 'S' to return to your Saved Destinations, or any other key to Quit: ")
+                # if nav_away_from_details.lower() == 's':
+                #     view_saved_destinations(user)
+                # else:
+                #     print("Goodbye\n")
+                #     pass
             else:
-                print("Invalid selection. Please try again") #TODO
+                print("Invalid selection. Please try again")
+                view_saved_destinations(user)
         
         # DELETE SAVED SEARCH
         elif selection.lower() == 'd':
             delete_saved_destination(user, user_id, saved_searches)
-                
         elif selection.lower() == "q":
             print("Goodbye\n")
             pass
@@ -305,7 +296,23 @@ def view_saved_destinations(user):
             print("Invalid entry. Please try again.")
             view_saved_destinations(user)
 
-# DELETE SAVED DESTINATION
+def display_single_destination_details(user, destination):
+    display_basic_location_details(destination)
+    menu_for_search_details(user, destination)
+
+def display_no_saved_searches(user):
+    print("No Saved Searches to display.\n")
+    menu = """\n------ Menu ------  \n[R] Return to Dashboard \n[Q] Quit\n------------------"""
+    print(f"{menu}\n")
+    selection = (input("Make a selection: "))
+    if selection.lower() == 'r':
+        user_dashboard(user)
+    elif selection.lower() == 'q':
+        pass
+    else:
+        print("Invalid selection. Please try again")
+        view_saved_destinations(user)
+
 def delete_saved_destination(user, user_id, saved_searches):
     display_title(f"{user}'s Saved Destinations:\n")
     for i in range(len(saved_searches)):
@@ -323,7 +330,7 @@ def delete_saved_destination(user, user_id, saved_searches):
         print("Invalid entry. Please try again.")
         view_saved_destinations(user)
 
-def display_details(destination):
+def display_basic_location_details(destination):
     display_title(f"Search Details for {destination['name']}\n")
     if 'zip' in destination and destination['zip'] != None:
         print(f"Zip code: {destination['zip']} \nLatitude: {destination['lat']} \nLongitude: {destination['lon']}\n\n")
@@ -332,12 +339,12 @@ def display_details(destination):
         print(f"Details for {destination['name']}: \nLatitude: {destination['lat']} \nLongitude: {destination['lon']}\n\n")
         print(f"Time zone data not available for {destination['name']}\n")
 
-def print_search_details_page_menu(user):
+def menu_for_search_details(user, destination):
     menu = "------ Menu ------  \n[R] Restaurant Search \n[W] Weather \n[S] Back to Saved Destinations \n[D] Back to Dashboard\n------------------"
     print(menu)
     choice = input("Make a selection: ")
     if choice.lower() == "r":
-        pass
+        perform_restaurant_search(user, destination)
     elif choice.lower() == "w":
         pass
     elif choice.lower() == "s":
@@ -373,23 +380,61 @@ def print_timezone_info(tz_data, name):
     hm_format = tz_data['hm_format']
     tz_abbreviation = tz_data['tz_abbreviation']
     local_time = tz_data['local_time']
-    print("-------- TIME ZONE INFORMATION --------")
+    print("---------- TIME ZONE INFORMATION ----------")
     print(f"Current Time in {name}: {hm_format} ({tz_abbreviation})")
     print(f"Your Local Time: {local_time}")
     print(f"{name} is {diff_message}.")
-    print("---------------------------------------\n")
+    print("-------------------------------------------\n")
 
 # ------------------------------------------------------------------------
 
 
 # ------------------------- PLACES SERVICE -------------------------------
-# for place in details:
-#     print(f"ID: {place['id']}")
-#     print(f"Name: {place['name']}")
-#     if place['description'] != None:
-#         print(f"Description: {place['description']['text']}")
-#     print("\n")
 
+def perform_restaurant_search(user, destination):
+    search_criteria = input("What kind of food: ")
+    if 'zip' in destination and destination['zip'] is not None:
+        print(f"Searching for {search_criteria} restaurants near {destination['zip']}...")
+        places_socket.send_string(f"{search_criteria} near {destination['zip']}")
+    else:
+        print(f"Searching for {search_criteria} restaurants near {destination['name']}...")
+        places_socket.send_string(f"{search_criteria} near {destination['name']}")
+    restaurant_search_results = places_socket.recv()
+    decoded_data = json.loads(restaurant_search_results.decode()) # list of dict objects
+    display_restaurant_search_results(decoded_data)
+    prompt_user_to_save_restaurants(user, decoded_data, destination)
+
+def display_restaurant_search_results(data):
+    for i in range(len(data)):
+        if data[i]['name'] is not None and data[i]['description'] is not None:
+            print(f"[{i}] {data[i]['name'].upper()}: {data[i]['description']['text']}")
+    print("\n")
+
+def prompt_user_to_save_restaurants(user, restaurant_search_data, destination):
+    choice = input("Enter the numbers of any restaurants you'd like to save (comma-separated) or 'D' to return to Dashboard: ")
+    if choice.lower() == 'd':
+        user_dashboard(user)
+    else:
+        restaurant_choices = choice.split(",")
+        save_restaurants(restaurant_choices, restaurant_search_data, user, destination)
+
+def save_restaurants(restaurant_choices, restaurant_search_data, user, destination):
+    for r in restaurant_choices:
+        r_data = {
+            'name': restaurant_search_data[int(r)]['name'],
+            'user_id': User.get_user_by_name({'name': user})[0]['id'], 
+            'destination_id': destination['id']
+        }
+        Restaurants.save_restaurant(r_data)
+        print("Success! Restaurant(s) saved.")
+        choice = input("Enter 'D' to return to your Dashboard, or any other key to Exit: ")
+        if choice.lower() == "d":
+            user_dashboard(user)
+        else:
+            pass
+
+def view_saved_restaurants(user, destination):
+    pass
 
 # ------------------------------------------------------------------------
 

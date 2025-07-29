@@ -78,3 +78,27 @@ class Search:
     def delete_search(cls, search_data):
         query = "DELETE FROM Searches WHERE user_id = %(user_id)s AND destination_id = %(destination_id)s;"
         return connectToMySQL(cls.db).query_db(query, search_data)
+
+
+class Restaurants:
+    db = "361_main"
+    def __init__(self, restaurant_data):
+        self.id = restaurant_data['id']
+        self.name = restaurant_data['name']
+        self.user_id = restaurant_data['user_id']
+        self.destination_id = restaurant_data['destination_id']
+
+    @classmethod
+    def save_restaurant(cls, restaurant_data):
+        query = "INSERT INTO Restaurants (name, user_id, destination_id) VALUES (%(name)s, %(user_id)s, %(destination_id)s);"
+        return connectToMySQL(cls.db).query_db(query, restaurant_data)
+
+    @classmethod
+    def get_saved_restaurants_by_destination(cls, data):
+        query = "SELECT id, name FROM Restaurants WHERE user_id = %(user_id)s AND destination_id = %(destination_id)s;"
+        return connectToMySQL(cls.db).query_db(query, data)
+
+    @classmethod
+    def delete_saved_restaurant_by_id(cls, restaurant_data):
+        query = "DELETE FROM Restaurants WHERE id = %(id)s;"
+        return connectToMySQL(cls.db).query_db(query, restaurant_data)
